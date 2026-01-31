@@ -4,11 +4,19 @@ from database import SessionLocal
 from models import User
 from connectors.factory import get_connector
 
-def process_users():
+def process_users(providers: list = None):
+    """
+    Syncs files for users matches the specified providers.
+    If providers is None, syncs all.
+    """
     db = SessionLocal()
     try:
-        users = db.query(User).all()
-        print(f"Found {len(users)} users to process.")
+        query = db.query(User)
+        if providers:
+            query = query.filter(User.provider.in_(providers))
+            
+        users = query.all()
+        print(f"Found {len(users)} users to process for providers: {providers or 'ALL'}")
         
         for user in users:
             try:

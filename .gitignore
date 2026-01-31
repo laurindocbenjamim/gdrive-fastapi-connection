@@ -1,1 +1,15 @@
+*.env
 .env
+.env.local
+.env.*.local
+
+gdrive.db
+*.db
+*.pyc
+__pycache__
+.venv
+.venv/*
+.venv\*
+.venv\*\*
+.venv\*\*\*
+.venv\*\*\*\*

@@ -106,3 +106,49 @@ def get_users(db: Session = Depends(get_db)):
             "has_refresh_token": bool(u.refresh_token)
         })
     return result
+
+# Configuration Check
+AVAILABLE_PROVIDERS = []
+if os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"):
+    AVAILABLE_PROVIDERS.append("google")
+if os.getenv("ONEDRIVE_CLIENT_ID") and os.getenv("ONEDRIVE_CLIENT_SECRET"):
+    AVAILABLE_PROVIDERS.append("onedrive")
+
+@app.get("/config")
+def get_config():
+    """Returns the available providers based on server configuration."""
+    return {
+        "available_providers": AVAILABLE_PROVIDERS,
+        "mode": "multi-provider" if len(AVAILABLE_PROVIDERS) > 1 else "single-provider"
+    }
+
+from fastapi import BackgroundTasks
+from worker import process_users
+
+class SyncRequest(BaseModel):
+    source_type: str = "both" # both, google, onedrive
+
+    @property
+    def valid_sources(self):
+         if self.source_type == "both":
+             return AVAILABLE_PROVIDERS
+         if self.source_type in AVAILABLE_PROVIDERS:
+             return [self.source_type]
+         return []
+
+@app.post("/sync")
+def trigger_sync(request: SyncRequest, background_tasks: BackgroundTasks):
+    """
+    Triggers the background synchronization.
+    
+    - **source_type**: 'google', 'onedrive', or 'both' (default).
+    """
+    target_providers = request.valid_sources
+    if not target_providers and request.source_type != "both":
+         raise HTTPException(status_code=400, detail=f"Provider '{request.source_type}' is not configured or invalid.")
+    
+    background_tasks.add_task(process_users, providers=target_providers)
+    return {
+        "message": "Sync process started in background.", 
+        "target_providers": target_providers
+    }
